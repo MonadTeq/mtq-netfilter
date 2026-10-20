@@ -8,7 +8,7 @@
 #define BUFMIN 128
 #define BUFCHUNK (1024*128)
 
-int z_readfile(FILE *F, char **buf, size_t *size, size_t extra_alloc)
+int z_readfile(FILE *F, char **buf, size_t *size, size_t extra_alloc, size_t max_size)
 {
 	z_stream zs;
 	int r;
@@ -16,6 +16,8 @@ int z_readfile(FILE *F, char **buf, size_t *size, size_t extra_alloc)
 	size_t bufsize;
 	void *newbuf;
 	size_t rd;
+
+	if (!max_size) max_size = Z_MAX_UNCOMPRESSED;
 
 	memset(&zs, 0, sizeof(zs));
 
@@ -46,6 +48,11 @@ int z_readfile(FILE *F, char **buf, size_t *size, size_t extra_alloc)
 			if ((bufsize - *size) < BUFMIN)
 			{
 				bufsize += BUFCHUNK;
+				if (bufsize > max_size)
+				{
+					r = Z_MEM_ERROR;
+					goto zerr;
+				}
 				newbuf = *buf ? realloc(*buf, bufsize + extra_alloc) : malloc(bufsize + extra_alloc);
 				if (!newbuf)
 				{
@@ -60,6 +67,11 @@ int z_readfile(FILE *F, char **buf, size_t *size, size_t extra_alloc)
 			r = inflate(&zs, Z_NO_FLUSH);
 
 			*size = bufsize - zs.avail_out;
+			if (*size > max_size)
+			{
+				r = Z_MEM_ERROR;
+				goto zerr;
+			}
 			if (r==Z_STREAM_END) break;
 			if (r==Z_BUF_ERROR)
 			{

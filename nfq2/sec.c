@@ -102,7 +102,109 @@ SYS_tkill,
 #ifdef SYS_tgkill
 SYS_tgkill,
 #endif
-SYS_kill, SYS_ptrace
+SYS_kill, SYS_ptrace,
+#ifdef SYS_fexecve
+SYS_fexecve,
+#endif
+#ifdef SYS_memfd_create
+SYS_memfd_create,
+#endif
+#ifdef SYS_userfaultfd
+SYS_userfaultfd,
+#endif
+#ifdef SYS_perf_event_open
+SYS_perf_event_open,
+#endif
+#ifdef SYS_bpf
+SYS_bpf,
+#endif
+#ifdef SYS_kexec_load
+SYS_kexec_load,
+#endif
+#ifdef SYS_kexec_file_load
+SYS_kexec_file_load,
+#endif
+#ifdef SYS_init_module
+SYS_init_module,
+#endif
+#ifdef SYS_finit_module
+SYS_finit_module,
+#endif
+#ifdef SYS_delete_module
+SYS_delete_module,
+#endif
+#ifdef SYS_mount
+SYS_mount,
+#endif
+#ifdef SYS_umount
+SYS_umount,
+#endif
+#ifdef SYS_umount2
+SYS_umount2,
+#endif
+#ifdef SYS_pivot_root
+SYS_pivot_root,
+#endif
+#ifdef SYS_chroot
+SYS_chroot,
+#endif
+#ifdef SYS_setns
+SYS_setns,
+#endif
+#ifdef SYS_unshare
+SYS_unshare,
+#endif
+#ifdef SYS_keyctl
+SYS_keyctl,
+#endif
+#ifdef SYS_add_key
+SYS_add_key,
+#endif
+#ifdef SYS_request_key
+SYS_request_key,
+#endif
+#ifdef SYS_iopl
+SYS_iopl,
+#endif
+#ifdef SYS_ioperm
+SYS_ioperm,
+#endif
+#ifdef SYS_swapon
+SYS_swapon,
+#endif
+#ifdef SYS_swapoff
+SYS_swapoff,
+#endif
+#ifdef SYS_reboot
+SYS_reboot,
+#endif
+#ifdef SYS_acct
+SYS_acct,
+#endif
+#ifdef SYS_sethostname
+SYS_sethostname,
+#endif
+#ifdef SYS_setdomainname
+SYS_setdomainname,
+#endif
+#ifdef SYS_personality
+SYS_personality,
+#endif
+#ifdef SYS_open_by_handle_at
+SYS_open_by_handle_at,
+#endif
+#ifdef SYS_name_to_handle_at
+SYS_name_to_handle_at,
+#endif
+#ifdef SYS_vhangup
+SYS_vhangup,
+#endif
+#ifdef SYS_kcmp
+SYS_kcmp,
+#endif
+#ifdef SYS_lookup_dcookie
+SYS_lookup_dcookie,
+#endif
 };
 #define BLOCKED_SYSCALL_COUNT (sizeof(blocked_syscalls)/sizeof(*blocked_syscalls))
 

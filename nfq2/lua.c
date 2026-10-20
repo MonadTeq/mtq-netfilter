@@ -54,6 +54,40 @@ void desync_instance(const char *func, unsigned int dp_n, unsigned int func_n, c
 	snprintf(instance, inst_size, "%s_%u_%u", func, dp_n, func_n);
 }
 
+// bound per-call Lua CPU usage to prevent infinite loops from hanging the packet loop
+#define LUA_INSTR_LIMIT_MAX 10000000
+#define LUA_INSTR_HOOK_STEP 1000
+#define LUA_MAX_ALLOC (1024*1024)
+
+static int lua_instr_budget;
+
+static void lua_instr_hook(lua_State *L, lua_Debug *ar)
+{
+	(void)ar;
+	if (--lua_instr_budget <= 0)
+	{
+		lua_sethook(L, NULL, 0, 0);
+		luaL_error(L, "LUA instruction limit exceeded");
+	}
+}
+static void lua_instr_arm(lua_State *L)
+{
+	lua_instr_budget = LUA_INSTR_LIMIT_MAX / LUA_INSTR_HOOK_STEP;
+	lua_sethook(L, lua_instr_hook, LUA_MASKCOUNT, LUA_INSTR_HOOK_STEP);
+}
+static void lua_instr_disarm(lua_State *L)
+{
+	lua_sethook(L, NULL, 0, 0);
+}
+int lua_pcall_instruc_limit(lua_State *L, int nargs, int nresults, int errfunc)
+{
+	lua_instr_arm(L);
+	int status = lua_pcall(L, nargs, nresults, errfunc);
+	lua_instr_disarm(L);
+	return status;
+}
+
+
 static void lua_check_argc(lua_State *L, const char *where, int argc)
 {
 	int num_args = lua_gettop(L);
@@ -469,7 +503,7 @@ static int luacall_brandom(lua_State *L)
 
 	LUA_STACK_GUARD_ENTER(L)
 	lua_Integer len = luaL_checkinteger(L,1);
-	if (len<0) luaL_error(L, "brandom: invalid arg");
+	if (len<0 || len>LUA_MAX_ALLOC) luaL_error(L, "brandom: invalid arg");
 	uint8_t *p = lua_newuserdata(L, len);
 	fill_random_bytes(p,len);
 	lua_pushlstring(L,(char*)p,len);
@@ -482,7 +516,7 @@ static int luacall_brandom_az(lua_State *L)
 
 	LUA_STACK_GUARD_ENTER(L)
 	lua_Integer len = luaL_checkinteger(L,1);
-	if (len<0) luaL_error(L, "brandom: invalid arg");
+	if (len<0 || len>LUA_MAX_ALLOC) luaL_error(L, "brandom: invalid arg");
 	uint8_t *p = lua_newuserdata(L, len);
 	fill_random_az(p,len);
 	lua_pushlstring(L,(char*)p,len);
@@ -495,7 +529,7 @@ static int luacall_brandom_az09(lua_State *L)
 
 	LUA_STACK_GUARD_ENTER(L)
 	lua_Integer len = luaL_checkinteger(L,1);
-	if (len<0) luaL_error(L, "brandom: invalid arg");
+	if (len<0 || len>LUA_MAX_ALLOC) luaL_error(L, "brandom: invalid arg");
 	uint8_t *p = lua_newuserdata(L, len);
 	fill_random_az09(p,len);
 	lua_pushlstring(L,(char*)p,len);
@@ -574,7 +608,7 @@ static int luacall_bcryptorandom(lua_State *L)
 	LUA_STACK_GUARD_ENTER(L)
 
 	lua_Integer len = luaL_checkinteger(L,1);
-	if (len<0) luaL_error(L, "bcryptorandom: invalid arg");
+	if (len<0 || len>LUA_MAX_ALLOC) luaL_error(L, "bcryptorandom: invalid arg");
 
 	uint8_t *p = lua_newuserdata(L, len);
 	if (!fill_crypto_random_bytes(p,len))
@@ -3540,6 +3574,8 @@ static int luacall_gunzip_inflate(lua_State *L)
 	uzs->zs.next_in = (z_const Bytef*)luaL_checklstring(L,2,&l);
 	uzs->zs.avail_in = (uInt)l;
 	size_t bufchunk = argc>=3 ? luaL_checkinteger(L,3) : l*4;
+	if (bufchunk > Z_MAX_UNCOMPRESSED)
+		luaL_error(L, "gunzip_inflate: chunk size too large");
 	size_t increment = bufchunk / 2;
 	if (increment < Z_INFL_BUF_INCREMENT) increment = Z_INFL_BUF_INCREMENT;
 
@@ -3547,6 +3583,11 @@ static int luacall_gunzip_inflate(lua_State *L)
 	{
 		if ((bufsize - size) < BUFMIN)
 		{
+			if (bufsize > Z_MAX_UNCOMPRESSED)
+			{
+				r = Z_MEM_ERROR;
+				goto zerr;
+			}
 			if (buf)
 			{
 				bufsize += increment;
@@ -3570,6 +3611,11 @@ static int luacall_gunzip_inflate(lua_State *L)
 		r = inflate(&uzs->zs, Z_NO_FLUSH);
 
 		size = bufsize - uzs->zs.avail_out;
+		if (size > Z_MAX_UNCOMPRESSED)
+		{
+			r = Z_MEM_ERROR;
+			goto zerr;
+		}
 		if (r==Z_STREAM_END) break;
 		if (r==Z_BUF_ERROR)
 		{
@@ -4160,7 +4206,7 @@ static int luaL_doZfile(lua_State *L, const char *filename)
 		FILE *F = fopen(fname, "rb");
 		if (!F)
 			luaL_error(L, "could not open lua file '%s'", fname);
-		r = z_readfile(F, &buf, &size, 0);
+		r = z_readfile(F, &buf, &size, 0, Z_MAX_UNCOMPRESSED);
 		fclose(F);
 		if (r != Z_STREAM_END)
 			luaL_error(L, "could not unzip lua file '%s'", fname);
@@ -4192,7 +4238,10 @@ static bool lua_init_scripts(void)
 				DLOG("LUA RUN STR: %s\n",s);
 			}
 		}
-		if ((status = str->str[0]=='@' ? luaL_doZfile(params.L, str->str+1) : luaL_dostring(params.L, str->str)))
+		lua_instr_arm(params.L);
+		status = str->str[0]=='@' ? luaL_doZfile(params.L, str->str+1) : luaL_dostring(params.L, str->str);
+		lua_instr_disarm(params.L);
+		if (status)
 		{
 			lua_perror(params.L);
 			return false;
@@ -4214,7 +4263,9 @@ static void lua_sec_harden(void)
 		{"io","popen",NULL},
 		{"package","loadlib",NULL},
 		{"debug", NULL, NULL},
-		{"package", "loaded", "debug"}
+		{"package", "loaded", "debug"},
+		{"require", NULL, NULL},
+		{"package", NULL, NULL}
 	};
 	DLOG("LUA REMOVE:");
 	for (int i=0;i<sizeof(bad)/sizeof(*bad);i++)

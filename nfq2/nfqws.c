@@ -113,21 +113,19 @@ static void onusr2(int sig)
 }
 static void onint(int sig)
 {
-	// theoretically lua_sethook is not async-safe. but it's one-time signal
+	// async safe. runaway lua is stopped by the instruction limit hook
 	if (bQuit) return;
 	const char *msg = "INT received !\n";
 	size_t wr = write(1, msg, strlen(msg));
 	bQuit = true;
-	lua_req_quit();
 }
 static void onterm(int sig)
 {
-	// theoretically lua_sethook is not async-safe. but it's one-time signal
+	// async safe. runaway lua is stopped by the instruction limit hook
 	if (bQuit) return;
 	const char *msg = "TERM received !\n";
 	size_t wr = write(1, msg, strlen(msg));
 	bQuit = true;
-	lua_req_quit();
 }
 
 static void catch_signals(void)
@@ -1148,7 +1146,8 @@ static struct blob_item *load_blob_to_collection(const char *filename, struct bl
 				DLOG_ERR("offset %llu is beyond file size %llu\n", ofs, (uint64_t)fsize);
 				exit_clean(1);
 			}
-			max_size = fsize - ofs;
+			if (max_size > (size_t)(fsize - ofs))
+				max_size = (size_t)(fsize - ofs);
 		}
 	}
 

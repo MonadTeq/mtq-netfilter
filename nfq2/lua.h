@@ -44,6 +44,7 @@ void desync_instance(const char *func, unsigned int dp_n, unsigned int func_n, c
 
 bool lua_test_init_script_files(void);
 void lua_req_quit(void);
+int lua_pcall_instruc_limit(lua_State *L, int nargs, int nresults, int errfunc);
 bool lua_init(void);
 void lua_shutdown(void);
 void lua_dlog_error(void);

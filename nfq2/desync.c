@@ -1073,7 +1073,7 @@ static uint8_t desync(
 
 							// prevent use of desync ctx object outside of function call
 							ctx->valid = true;
-							status = lua_pcall(params.L, 2, LUA_MULTRET, 0);
+							status = lua_pcall_instruc_limit(params.L, 2, LUA_MULTRET, 0);
 							ctx->valid = false;
 
 							if (status)

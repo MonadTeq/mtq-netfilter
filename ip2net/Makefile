@@ -1,37 +1,38 @@
 CC ?= cc
 OPTIMIZE ?= -Os
 CFLAGS_PIC = -fPIC
-CFLAGS += -std=gnu99 $(OPTIMIZE) -flto=auto $(CFLAGS_PIC)
+CFLAGS += -std=gnu99 $(OPTIMIZE) $(CFLAGS_PIC)
 CFLAGS_BSD = -Wno-address-of-packed-member
 CFLAGS_WIN = -static
 LDFLAGS_PIE = -pie
 LDFLAGS +=  $(LDFLAGS_PIE)
-
-LIBS = 
+LIBS = -lpthread
+LIBS_ANDROID =
 LIBS_WIN = -lws2_32
-SRC_FILES = ip2net.c qsort.c
+SRC_FILES = *.c
 
-all: ip2net
+all: mdig
 
-ip2net: $(SRC_FILES)
-	$(CC) -s $(CFLAGS) -o ip2net $(SRC_FILES) $(LIBS) $(LDFLAGS)
+mdig: $(SRC_FILES)
+	$(CC) -s $(CFLAGS) -o mdig $(SRC_FILES) $(LIBS) $(LDFLAGS)
 
-systemd: ip2net
+systemd: mdig
 
-android: ip2net
+android: $(SRC_FILES)
+	$(CC) -s $(CFLAGS) -o mdig $(SRC_FILES) $(LIBS_ANDROID) $(LDFLAGS)
 
 bsd: $(SRC_FILES)
-	$(CC) -s $(CFLAGS) $(CFLAGS_BSD) -o ip2net $(SRC_FILES) $(LIBS) $(LDFLAGS)
+	$(CC) -s $(CFLAGS) $(CFLAGS_BSD) -o mdig $(SRC_FILES) $(LIBS) $(LDFLAGS)
 
 mac: $(SRC_FILES)
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o ip2neta $(SRC_FILES) -target arm64-apple-macos10.8 $(LIBS) $(LDFLAGS)
-	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o ip2netx $(SRC_FILES) -target x86_64-apple-macos10.8 $(LIBS) $(LDFLAGS)
-	strip ip2neta ip2netx
-	lipo -create -output ip2net ip2netx ip2neta
-	rm -f ip2netx ip2neta
+	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o mdiga $(SRC_FILES) -target arm64-apple-macos10.8 $(LIBS_BSD) $(LDFLAGS)
+	$(CC) $(CFLAGS) $(CFLAGS_BSD) -o mdigx $(SRC_FILES) -target x86_64-apple-macos10.8 $(LIBS_BSD) $(LDFLAGS)
+	strip mdiga mdigx
+	lipo -create -output mdig mdigx mdiga
+	rm -f mdigx mdiga
 
 win: $(SRC_FILES)
-	$(CC) -s $(CFLAGS) $(CFLAGS_WIN) -o ip2net $(SRC_FILES) $(LIBS_WIN) $(LDFLAGS)
+	$(CC) -s $(CFLAGS) $(CFLAGS_WIN) -o mdig $(SRC_FILES) $(LIBS_WIN) $(LDFLAGS)
 
 clean:
-	rm -f ip2net *.o
+	rm -f mdig *.o

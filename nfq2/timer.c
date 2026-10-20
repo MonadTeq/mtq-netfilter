@@ -59,7 +59,7 @@ static bool TimerPoolRunTimer(timer_pool *p)
 	lua_rawgeti(params.L, LUA_REGISTRYINDEX, p->lua_ref);
 	p->fires++;
 	DLOG("\ntimer: '%s' period %llu oneshot %u fires=%u\n",p->str,p->period,p->oneshot,p->fires);
-	int status = lua_pcall(params.L, 2, 0, 0);
+	int status = lua_pcall_instruc_limit(params.L, 2, 0, 0);
 	if (status)
 	{
 		lua_dlog_error();
